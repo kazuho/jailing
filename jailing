@@ -61,6 +61,16 @@ for my $dir (@TEMPDIRS) {
         or die "failed to chmod $root/$dir:$!";
 }
 
+# create passwd and group
+if (! -e "$root/etc/passwd") {
+    system("egrep '^(root|nobody):' < /etc/passwd > $root/etc/passwd") == 0
+        or die "failed to create $root/etc/passwd file:$!";
+}
+if (! -e "$root/etc/group") {
+    system("egrep '^no(body|group):' < /etc/group > $root/etc/group") == 0
+        or die "failed to create $root/etc/group file:$!";
+}
+
 for my $dir (@BINDDIRS) {
     if (is_empty("$root/$dir")) {
         run_cmd("mount", "--bind", "/$dir", "$root/$dir");
