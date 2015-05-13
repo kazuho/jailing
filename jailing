@@ -62,7 +62,7 @@ for my $dir (@TEMPDIRS) {
 for my $dir (@BINDDIRS) {
     if (is_empty("$root/$dir")) {
         run_cmd("mount", "--bind", "/$dir", "$root/$dir");
-        run_cmd("mount", "-o", "remount,ro", "$root/$dir");
+        run_cmd("mount", "-o", "remount,ro,bind", "$root/$dir");
     }
 }
 
