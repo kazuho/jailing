@@ -25,6 +25,8 @@ GetOptions(
 # cleanup $root
 die "--root not specified\n"
     unless $root;
+die "--root must be an absolute path\n"
+    unless $root =~ m{^/}s;
 $root =~ s{/$}{}gs;
 
 if ($opt_umount) {
