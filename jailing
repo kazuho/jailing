@@ -87,6 +87,8 @@ run_cmd(qw(mknod -m 666), "$root/dev/null", qw(c 1 3))
     unless -e "$root/dev/null";
 run_cmd(qw(mknod -m 666), "$root/dev/zero", qw(c 1 5))
     unless -e "$root/dev/zero";
+run_cmd(qw(mknod -m 666), "$root/dev/urandom", qw(c 1 9))
+    unless -e "$root/dev/urandom";
 
 # just print the status if no args
 if (! @ARGV) {
