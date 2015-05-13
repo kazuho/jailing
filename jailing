@@ -136,6 +136,10 @@ The system directories are remounted read-only (via `mount --bind` and `mount -o
 mandatory argument specifying the root of the chroot jail.
 The directory is automatically created if it does not exist.
 
+=head2 --umount
+
+unmounts the bound mount points for the jail
+
 =head1 AUTHOR
 
 Kazuho Oku

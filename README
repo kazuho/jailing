@@ -21,6 +21,9 @@ OPTIONS
     mandatory argument specifying the root of the chroot jail. The directory
     is automatically created if it does not exist.
 
+  --umount
+    unmounts the bound mount points for the jail
+
 AUTHOR
     Kazuho Oku
 
