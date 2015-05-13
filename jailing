@@ -5,12 +5,20 @@ use warnings;
 use Errno ();
 use Getopt::Long;
 use Pod::Usage qw(pod2usage);
+require 'syscall.ph';
 
 our $VERSION = '0.01';
 
 our @NEWDIRS = qw(etc etc/ssl run usr var var/log);
 our @BINDDIRS = grep { -d "/$_" } qw(bin etc/ssl/certs lib lib64 sbin usr/bin usr/include usr/lib usr/lib64 usr/sbin usr/share usr/src);
 our @TEMPDIRS = qw(tmp run/lock var/tmp);
+our %KEEP_CAPS = map { $_ => 1 } (
+    0,  # CAP_CHOWN
+    3,  # CAP_FOWNER
+    4,  # CAP_FSETID
+    6,  # CAP_SETGID
+    14, # CAP_IPC_LOCK
+);
 
 my ($root, $opt_umount);
 
@@ -103,6 +111,7 @@ chroot($root)
     or die "failed to chroot to $root:$!";
 chdir "/"
     or die "failed to chroot to /:$!";
+drop_capabilities();
 exec @ARGV;
 die "failed to exec:$ARGV[0]:$!";
 
@@ -121,6 +130,18 @@ sub is_empty {
             unless $fn eq '.' || $fn eq '..';
     }
     return 1;
+}
+
+sub drop_capabilities {
+    for (my $i = 0; ; ++$i) {
+       if (! $KEEP_CAPS{$i}) {
+           # test if capability exists
+           last if syscall(&SYS_prctl, 23) < 0;
+           if (syscall(&SYS_prctl, 24, $i) < 0) {
+               warn "failed to drop capability:$i";
+           }
+       }
+    }
 }
 
 __END__
