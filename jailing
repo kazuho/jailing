@@ -1,0 +1,144 @@
+#! /usr/bin/perl
+
+use strict;
+use warnings;
+use Errno ();
+use Getopt::Long;
+use Pod::Usage qw(pod2usage);
+
+our $VERSION = '0.01';
+
+our @NEWDIRS = qw(etc run usr var var/log);
+our @BINDDIRS = grep { -d "/$_" } qw(bin lib lib64 sbin usr/bin usr/include usr/lib usr/sbin usr/share usr/src);
+our @TEMPDIRS = qw(tmp run/lock var/tmp);
+
+my ($root, $opt_umount);
+
+GetOptions(
+    'root=s' => \$root,
+    umount   => \$opt_umount,
+    help     => sub {
+        pod2usage(0);
+    },
+) or exit(1);
+
+# cleanup $root
+die "--root not specified\n"
+    unless $root;
+$root =~ s{/$}{}gs;
+
+if ($opt_umount) {
+    die "root does not exist, cowardly refusing to umount\n"
+        unless -d $root;
+    open my $fh, "-|", "LANG=C mount"
+        or die "failed to exec mount:$!";
+    while (my $line = <$fh>) {
+        if ($line =~ m{ on $root/([^ ]+)}) {
+            run_cmd("umount", "$root/$1");
+        }
+    }
+    exit 0;
+}
+
+# create the directory if not exists
+if (! -e $root) {
+    mkdir $root
+        or die "failed to create directory:$root:$!";
+}
+
+# create directories
+for my $dir (@NEWDIRS, @BINDDIRS, @TEMPDIRS) {
+    mkdir "$root/$dir"
+       or $! == Errno::EEXIST
+       or die "failed to create directory:$!";
+}
+
+# chmod the temporary directories
+for my $dir (@TEMPDIRS) {
+    chmod 01777, "$root/$dir"
+        or die "failed to chmod $root/$dir:$!";
+}
+
+for my $dir (@BINDDIRS) {
+    if (is_empty("$root/$dir")) {
+        run_cmd("mount", "--bind", "/$dir", "$root/$dir");
+        run_cmd("mount", "-o", "remount,ro", "$root/$dir");
+    }
+}
+
+# create symlinks
+symlink "../run/lock", "$root/var/lock";
+
+# create devices
+mkdir "$root/dev";
+run_cmd(qw(mknod -m 666), "$root/dev/null", qw(c 1 3))
+    unless -e "$root/dev/null";
+run_cmd(qw(mknod -m 666), "$root/dev/zero", qw(c 1 5))
+    unless -e "$root/dev/zero";
+
+# just print the status if no args
+if (! @ARGV) {
+    print "jail is ready!\n";
+    exit 0;
+}
+
+# chroot and exec
+chroot($root)
+    or die "failed to chroot to $root:$!";
+chdir "/"
+    or die "failed to chroot to /:$!";
+exec @ARGV;
+die "failed to exec:$ARGV[0]:$!";
+
+sub run_cmd {
+    my @argv = @_;
+    system(@argv) == 0
+        or die "failed to exec $argv[0]:$!";
+}
+
+sub is_empty {
+    my $path = shift;
+    opendir my $fh, $path
+        or die "failed to opendir:$path:$!";
+    while (my $fn = readdir $fh) {
+        return 0
+            unless $fn eq '.' || $fn eq '..';
+    }
+    return 1;
+}
+
+__END__
+
+=head1 NAME
+
+jailing - a minimalistic chroot jail builder/runner for Linux
+
+=head1 SYNOPSIS
+
+  # create and/or enter the jail, and optionally run the command
+  jailing --root=/path/to/chroot/jail [cmd ...]
+
+  # unmount the bind mounts of the jail
+  jailing --root=/path/to/chroot/jail --umount
+
+=head1 DESCRIPTION
+
+The command creates a chroot jail if it does not exist, and runs the given commands within the jail.
+
+The system directories are remounted read-only (via `mount --bind` and `mount -o remount,ro`) to minimalize the setup time and disk usage.  Other directories are created automatically.
+
+=head1 OPTIONS
+
+=head2 --root=path
+
+mandatory argument specifying the root of the chroot jail.
+The directory is automatically created if it does not exist.
+
+=head1 AUTHOR
+
+Kazuho Oku
+
+=head1 LICENSE
+
+MIT
+

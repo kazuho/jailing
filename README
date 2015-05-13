@@ -1,0 +1,29 @@
+NAME
+    jailing - a minimalistic chroot jail builder/runner for Linux
+
+SYNOPSIS
+      # create and/or enter the jail, and optionally run the command
+      jailing --root=/path/to/chroot/jail [cmd ...]
+
+      # unmount the bind mounts of the jail
+      jailing --root=/path/to/chroot/jail --umount
+
+DESCRIPTION
+    The command creates a chroot jail if it does not exist, and runs the
+    given commands within the jail.
+
+    The system directories are remounted read-only (via `mount --bind` and
+    `mount -o remount,ro`) to minimalize the setup time and disk usage.
+    Other directories are created automatically.
+
+OPTIONS
+  --root=path
+    mandatory argument specifying the root of the chroot jail. The directory
+    is automatically created if it does not exist.
+
+AUTHOR
+    Kazuho Oku
+
+LICENSE
+    MIT
+
