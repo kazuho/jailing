@@ -26,6 +26,11 @@ our @BINDDIRS = grep { -d "/$_" } qw(
     usr/src
 );
 our @TEMPDIRS = qw(tmp run/lock var/tmp);
+our @COPYFILES = qw(
+    etc/group
+    etc/passwd
+    etc/resolv.conf
+);
 our %KEEP_CAPS = map { $_ => 1 } ();
 
 my ($root, $opt_umount);
@@ -77,14 +82,10 @@ for my $dir (@TEMPDIRS) {
         or die "failed to chmod $root/$dir:$!";
 }
 
-# create passwd and group
-if (! -e "$root/etc/passwd") {
-    system("egrep '^(root|nobody):' < /etc/passwd > $root/etc/passwd") == 0
-        or die "failed to create $root/etc/passwd file:$!";
-}
-if (! -e "$root/etc/group") {
-    system("egrep '^(root|nobody|nogroup):' < /etc/group > $root/etc/group") == 0
-        or die "failed to create $root/etc/group file:$!";
+# copy files
+for my $file (@COPYFILES) {
+    run_cmd("cp", "-p", "/$file", "$root/$file")
+        unless -e "$root/$file";
 }
 
 for my $dir (@BINDDIRS) {
