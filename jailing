@@ -26,6 +26,7 @@ our @BINDDIRS = grep { -d "/$_" } qw(
     usr/include
     usr/lib
     usr/lib64
+    usr/libexec
     usr/sbin
     usr/share
     usr/src
