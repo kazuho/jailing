@@ -72,7 +72,7 @@ if ($opt_umount) {
 # create directories
 mkdir_p($root);
 mkdir_p("$root/$_")
-    for (@NEWDIRS, @BINDDIRS, @TEMPDIRS);
+    for (@NEWDIRS, @TEMPDIRS);
 
 # chmod the temporary directories
 for my $dir (@TEMPDIRS) {
@@ -88,10 +88,24 @@ for my $file (@COPYFILES) {
 
 # bind the directories
 for my $dir (@BINDDIRS) {
-    if (is_empty("$root/$dir")) {
-        run_cmd("mount", "--bind", "/$dir", "$root/$dir");
-        run_cmd("mount", "-o", "remount,ro,bind", "$root/$dir");
-    }
+    if (-l "/$dir") {
+        unless (-l "$root/$dir") {
+            if ($dir =~ m{^/[^/]+$}s) {
+                mkdir_p("$root/$`");
+            }
+            my $dest = readlink("/$dir");
+            defined($dest)
+                or die "failed to read symlink(/$dir):$!";
+            symlink($dest, "$root/$dir") == 1
+                or die "failed to create symlink($root/$dir -> $dest):$!";
+        }
+    } else {
+        mkdir_p("$root/$dir");
+        if (is_empty("$root/$dir")) {
+            run_cmd("mount", "--bind", "/$dir", "$root/$dir");
+            run_cmd("mount", "-o", "remount,ro,bind", "$root/$dir");
+        }
+   }
 }
 
 # bind the custom directories
