@@ -10,7 +10,21 @@ require 'syscall.ph';
 our $VERSION = '0.01';
 
 our @NEWDIRS = qw(etc etc/ssl run usr var var/log);
-our @BINDDIRS = grep { -d "/$_" } qw(bin etc/ssl/certs lib lib64 sbin usr/bin usr/include usr/lib usr/lib64 usr/sbin usr/share usr/src);
+our @BINDDIRS = grep { -d "/$_" } qw(
+    bin
+    etc/alternatives
+    etc/ssl/certs
+    lib
+    lib64
+    sbin
+    usr/bin
+    usr/include
+    usr/lib
+    usr/lib64
+    usr/sbin
+    usr/share
+    usr/src
+);
 our @TEMPDIRS = qw(tmp run/lock var/tmp);
 our %KEEP_CAPS = map { $_ => 1 } ();
 
