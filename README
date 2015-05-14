@@ -21,6 +21,11 @@ OPTIONS
     mandatory argument specifying the root of the chroot jail. The directory
     is automatically created if it does not exist.
 
+  --bind src-path[:dest-path]
+    mounts src-path of host to dest-path of the jail. Both paths should be
+    specified in absolute form (i.e. start with "/"). If dest-path is
+    omitted, then it would be mounted at "src-path" in the jail.
+
   --umount
     unmounts the bound mount points for the jail
 
