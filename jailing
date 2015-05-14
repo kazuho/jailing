@@ -7,7 +7,7 @@ use Getopt::Long;
 use Pod::Usage qw(pod2usage);
 require 'syscall.ph';
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 our @NEWDIRS = qw(
     etc
