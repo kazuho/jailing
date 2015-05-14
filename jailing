@@ -70,10 +70,10 @@ if (! -e $root) {
 }
 
 # create directories
-for my $dir (@NEWDIRS, @BINDDIRS, @TEMPDIRS) {
+for my $dir (@NEWDIRS, @TEMPDIRS) {
     mkdir "$root/$dir"
-       or $! == Errno::EEXIST
-       or die "failed to create directory:$!";
+        or $! == Errno::EEXIST
+        or die "failed to create directory:$!";
 }
 
 # chmod the temporary directories
@@ -89,10 +89,23 @@ for my $file (@COPYFILES) {
 }
 
 for my $dir (@BINDDIRS) {
-    if (is_empty("$root/$dir")) {
-        run_cmd("mount", "--bind", "/$dir", "$root/$dir");
-        run_cmd("mount", "-o", "remount,ro,bind", "$root/$dir");
-    }
+    if (-l "/$dir") {
+        unless (-l "$root/$dir") {
+            my $dest = readlink("/$dir");
+            defined($dest)
+                or die "failed to read symlink(/$dir):$!";
+            symlink($dest, "$root/$dir") == 1
+                or die "failed to create symlink($root/$dir -> $dest):$!";
+        }
+    } else {
+        mkdir "$root/$dir"
+            or $! == Errno::EEXIST
+            or die "failed to create directory:$!";
+        if (is_empty("$root/$dir")) {
+            run_cmd("mount", "--bind", "/$dir", "$root/$dir");
+            run_cmd("mount", "-o", "remount,ro,bind", "$root/$dir");
+        }
+   }
 }
 
 # create symlinks
