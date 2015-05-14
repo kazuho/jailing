@@ -48,6 +48,10 @@ GetOptions(
     help     => sub {
         pod2usage(0);
     },
+    version  => sub {
+        print "$VERSION\n";
+        exit(0);
+    },
 ) or exit(1);
 
 # cleanup $root
