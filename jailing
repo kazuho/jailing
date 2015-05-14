@@ -12,13 +12,7 @@ our $VERSION = '0.01';
 our @NEWDIRS = qw(etc etc/ssl run usr var var/log);
 our @BINDDIRS = grep { -d "/$_" } qw(bin etc/ssl/certs lib lib64 sbin usr/bin usr/include usr/lib usr/lib64 usr/sbin usr/share usr/src);
 our @TEMPDIRS = qw(tmp run/lock var/tmp);
-our %KEEP_CAPS = map { $_ => 1 } (
-    0,  # CAP_CHOWN
-    3,  # CAP_FOWNER
-    4,  # CAP_FSETID
-    6,  # CAP_SETGID
-    14, # CAP_IPC_LOCK
-);
+our %KEEP_CAPS = map { $_ => 1 } ();
 
 my ($root, $opt_umount);
 
