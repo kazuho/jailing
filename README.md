@@ -21,7 +21,6 @@ For example, if you have Apache HTTP server installed under `/usr/local/apache`,
 INSTALLATION
 ------------
 
-Fetch the latest release tarball from http://search.cpan.org/dist/App-jailing/, and run:
 ```
 % perl Makefile.PL
 % make

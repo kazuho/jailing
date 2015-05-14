@@ -1,12 +1,6 @@
-use inc::Module::Install;
+use ExtUtils::MakeMaker;
 
-name 'App-jailing';
-all_from 'jailing';
-perl_version '5.8.8';
-
-install_script 'jailing';
-
-auto_include;
-auto_install;
-
-WriteAll;
+WriteMakefile(
+    NAME         => "App-jailing",
+    VERSION_FROM => "jailing",
+);
