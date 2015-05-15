@@ -3,7 +3,7 @@ jailing
 
 Jailing is a minimalistic chroot jail builder/runner script.
 
-By no means, it is (or tries to be) a container service.
+It is by no means a container service, or tries to be.
 It is a helper tool for running a program under a restricted environment, preventing it from making changes to other parts of the host even if gets cracked.
 
 When invoked, it automatically setups the chroot environment by doing the following, and then executes the given command within the environment.
