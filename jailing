@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use Errno ();
 use Getopt::Long;
+use File::Basename qw(basename);
 use Pod::Usage qw(pod2usage);
 require 'syscall.ph';
 
@@ -18,7 +19,6 @@ our @NEWDIRS = qw(
 our @BINDDIRS = grep { -d "/$_" } qw(
     bin
     etc/alternatives
-    etc/ssl/certs
     lib
     lib64
     sbin
@@ -89,6 +89,14 @@ for my $dir (@TEMPDIRS) {
 for my $file (@COPYFILES) {
     run_cmd("cp", "-p", "/$file", "$root/$file")
         unless -e "$root/$file";
+}
+
+# copy certs
+mkdir_p("$root/etc/ssl/certs");
+for my $file (map { basename($_) } glob("/etc/ssl/certs/*")) {
+    run_cmd("cp", "--dereference",
+        "/etc/ssl/certs/$file", "$root/etc/ssl/certs/$file")
+            unless -e "$root/etc/ssl/certs/$file";
 }
 
 # bind the directories
