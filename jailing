@@ -18,6 +18,8 @@ our @NEWDIRS = qw(
 our @BINDDIRS = grep { -d "/$_" } qw(
     bin
     etc/alternatives
+    etc/pki/tls/certs
+    etc/pki/ca-trust
     etc/ssl/certs
     lib
     lib64
@@ -95,7 +97,7 @@ for my $file (@COPYFILES) {
 for my $dir (@BINDDIRS) {
     if (-l "/$dir") {
         unless (-l "$root/$dir") {
-            if ($dir =~ m{^/[^/]+$}s) {
+            if ($dir =~ m{/[^/]+$}s) {
                 mkdir_p("$root/$`");
             }
             my $dest = readlink("/$dir");
