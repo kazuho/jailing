@@ -3,6 +3,9 @@ jailing
 
 Jailing is a minimalistic chroot jail builder/runner script.
 
+By no means, it is (or tries to be) a container service.
+It is a helper tool for running a program under a restricted environment, preventing it from making changes to other parts of the host even if gets cracked.
+
 When invoked, it automatically setups the chroot environment by doing the following, and then executes the given command within the environment.
 - remount system directories as read-only under the chroot directory tree
 - copy setting files (/etc/passwd, /etc/resolv.conf, etc.)
