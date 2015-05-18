@@ -41,16 +41,17 @@ our @COPYFILES = qw(
 );
 our %KEEP_CAPS = map { $_ => 1 } ();
 
-my ($root, @bind, $opt_umount);
+my ($root, @bind, @robind, $opt_umount);
 
 GetOptions(
-    'root=s' => \$root,
-    'bind=s' => \@bind,
-    umount   => \$opt_umount,
-    help     => sub {
+    'root=s'   => \$root,
+    'bind=s'   => \@bind,
+    'robind=s' => \@robind,
+    umount     => \$opt_umount,
+    help       => sub {
         pod2usage(0);
     },
-    version  => sub {
+    version    => sub {
         print "$VERSION\n";
         exit(0);
     },
@@ -116,23 +117,10 @@ for my $dir (@BINDDIRS) {
 }
 
 # bind the custom directories
-if (@bind) {
-    for my $bind (@bind) {
-        my ($src, $dest) = split ":", $bind, 2;
-        $dest = $src
-            unless defined $dest;
-        die "paths of `--bind=src-path[:dest-path]` option must be absolute\n"
-            unless $src =~ m{^/}s && $dest =~ m{^/}s;
-        $dest =~ s{^/}{}s;
-        if (is_empty("$src")) {
-            run_cmd("touch", "$src/.jailing.keep");
-        }
-        mkdir_p("$root/$dest");
-        if (is_empty("$root/$dest")) {
-            run_cmd("mount", "--bind", "$src", "$root/$dest");
-        }
-    }
-}
+bind_custom($_, 0)
+    for @bind;
+bind_custom($_, 1)
+    for @robind;
 
 # create symlinks
 symlink "../run/lock", "$root/var/lock";
@@ -178,6 +166,25 @@ sub is_empty {
             unless $fn eq '.' || $fn eq '..';
     }
     return 1;
+}
+
+sub bind_custom {
+    my ($arg, $readonly) = @_;
+    my ($src, $dest) = split ":", $arg, 2;
+    $dest = $src
+        unless defined $dest;
+    die "paths of `--bind=src-path[:dest-path]` option must be absolute\n"
+        unless $src =~ m{^/}s && $dest =~ m{^/}s;
+    $dest =~ s{^/}{}s;
+    if (is_empty("$src")) {
+        run_cmd("touch", "$src/.jailing.keep");
+    }
+    mkdir_p("$root/$dest");
+    if (is_empty("$root/$dest")) {
+        run_cmd("mount", "--bind", "$src", "$root/$dest");
+        run_cmd("mount", "-o", "remount,ro,bind", "$root/$dest")
+            if $readonly;
+    }
 }
 
 sub drop_capabilities {
@@ -232,9 +239,13 @@ The directory is automatically created if it does not exist.
 
 =head2 --bind src-path[:dest-path]
 
+=head2 --robind src-path[:dest-path]
+
 mounts src-path of host to dest-path of the jail.
 Both paths should be specified in absolute form (i.e. start with C</>).
 If dest-path is omitted, then it would be mounted at C<src-path> in the jail.
+
+C<--bind> mounts the path in read-write mode.  C<--robind> mounts as read-only.
 
 =head2 --umount
 
