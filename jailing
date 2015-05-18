@@ -114,23 +114,8 @@ for my $dir (@BINDDIRS) {
 }
 
 # bind the custom directories
-if (@bind) {
-    for my $bind (@bind) {
-        my ($src, $dest) = split ":", $bind, 2;
-        $dest = $src
-            unless defined $dest;
-        die "paths of `--bind=src-path[:dest-path]` option must be absolute\n"
-            unless $src =~ m{^/}s && $dest =~ m{^/}s;
-        $dest =~ s{^/}{}s;
-        if (is_empty("$src")) {
-            run_cmd("touch", "$src/.jailing.keep");
-        }
-        mkdir_p("$root/$dest");
-        if (is_empty("$root/$dest")) {
-            run_cmd("mount", "--bind", "$src", "$root/$dest");
-        }
-    }
-}
+bind_custom($_)
+    for @bind;
 
 # create symlinks
 symlink "../run/lock", "$root/var/lock";
@@ -176,6 +161,23 @@ sub is_empty {
             unless $fn eq '.' || $fn eq '..';
     }
     return 1;
+}
+
+sub bind_custom {
+    my $arg = shift;
+    my ($src, $dest) = split ":", $arg, 2;
+    $dest = $src
+        unless defined $dest;
+    die "paths of `--bind=src-path[:dest-path]` option must be absolute\n"
+        unless $src =~ m{^/}s && $dest =~ m{^/}s;
+    $dest =~ s{^/}{}s;
+    if (is_empty("$src")) {
+        run_cmd("touch", "$src/.jailing.keep");
+    }
+    mkdir_p("$root/$dest");
+    if (is_empty("$root/$dest")) {
+        run_cmd("mount", "--bind", "$src", "$root/$dest");
+    }
 }
 
 sub drop_capabilities {
