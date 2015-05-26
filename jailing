@@ -39,7 +39,11 @@ our @COPYFILES = qw(
     etc/passwd
     etc/resolv.conf
 );
-our %KEEP_CAPS = map { $_ => 1 } ();
+our %KEEP_CAPS = map { $_ => 1 } (
+    6,  # CAP_SETGID
+    7,  # CAP_SETUID
+    10, # CAP_NET_BIND_SERVICE
+);
 
 my ($root, @bind, @robind, $opt_umount);
 
