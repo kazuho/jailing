@@ -188,15 +188,19 @@ sub bind_custom {
 }
 
 sub drop_capabilities {
-    for (my $i = 0; ; ++$i) {
+    my $i;
+    for ($i = 0; ; ++$i) {
        if (! $KEEP_CAPS{$i}) {
            # test if capability exists
-           last if syscall(&SYS_prctl, 23) < 0;
+           last if syscall(&SYS_prctl, 23, $i) < 0;
            if (syscall(&SYS_prctl, 24, $i) < 0) {
                warn "failed to drop capability:$i";
            }
        }
     }
+    # we should at least succeed in dropping _some_ capabilities
+    die "failed to drop capabilities:$!"
+        if $i == 0;
 }
 
 sub mkdir_p {
