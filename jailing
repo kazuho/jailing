@@ -38,6 +38,7 @@ our @COPYFILES = qw(
     etc/group
     etc/passwd
     etc/resolv.conf
+    etc/hosts
 );
 our %KEEP_CAPS = map { $_ => 1 } (
     6,  # CAP_SETGID
