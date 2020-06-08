@@ -41,6 +41,7 @@ our @COPYFILES = qw(
     etc/hosts
 );
 our %KEEP_CAPS = map { $_ => 1 } (
+    0,  # CAP_CHOWN
     6,  # CAP_SETGID
     7,  # CAP_SETUID
     10, # CAP_NET_BIND_SERVICE
