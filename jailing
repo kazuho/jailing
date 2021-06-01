@@ -42,6 +42,7 @@ our @COPYFILES = qw(
 );
 our %KEEP_CAPS = map { $_ => 1 } (
     0,  # CAP_CHOWN
+    1,  # CAP_DAC_OVERRIDE
     5,  # CAP_KILL
     6,  # CAP_SETGID
     7,  # CAP_SETUID
