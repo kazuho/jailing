@@ -53,8 +53,12 @@ my ($root, @bind, @robind, $opt_umount);
 
 GetOptions(
     'root=s'   => \$root,
-    'bind=s'   => \@bind,
-    'robind=s' => \@robind,
+    'bind=s'   => sub {
+        push @bind, [$_[1], undef];
+    },
+    'robind=s' => sub {
+        push @bind, [$_[1], 1];
+    },
     umount     => \$opt_umount,
     help       => sub {
         pod2usage(0);
@@ -115,20 +119,16 @@ for my $dir (@BINDDIRS) {
             symlink($dest, "$root/$dir") == 1
                 or die "failed to create symlink($root/$dir -> $dest):$!";
         }
-    } else {
+    } elsif (!is_mountpoint("$root/$dir")) {
         mkdir_p("$root/$dir");
-        if (is_empty("$root/$dir")) {
-            run_cmd("mount", "--bind", "/$dir", "$root/$dir");
-            run_cmd("mount", "-o", "remount,ro,bind", "$root/$dir");
-        }
+        run_cmd("mount", "--bind", "/$dir", "$root/$dir");
+        run_cmd("mount", "-o", "remount,ro,bind", "$root/$dir");
    }
 }
 
 # bind the custom directories
-bind_custom($_, 0)
+bind_custom(@$_)
     for @bind;
-bind_custom($_, 1)
-    for @robind;
 
 # create symlinks
 symlink "../run/lock", "$root/var/lock";
@@ -165,15 +165,9 @@ sub run_cmd {
         or die "failed to exec $argv[0]:$!";
 }
 
-sub is_empty {
+sub is_mountpoint {
     my $path = shift;
-    opendir my $fh, $path
-        or die "failed to opendir:$path:$!";
-    while (my $fn = readdir $fh) {
-        return 0
-            unless $fn eq '.' || $fn eq '..';
-    }
-    return 1;
+    return system("mountpoint", "-q", $path) == 0;
 }
 
 sub bind_custom {
@@ -184,11 +178,8 @@ sub bind_custom {
     die "paths of `--bind=src-path[:dest-path]` option must be absolute\n"
         unless $src =~ m{^/}s && $dest =~ m{^/}s;
     $dest =~ s{^/}{}s;
-    if (is_empty("$src")) {
-        run_cmd("touch", "$src/.jailing.keep");
-    }
-    mkdir_p("$root/$dest");
-    if (is_empty("$root/$dest")) {
+    if (!is_mountpoint("$root/$dest")) {
+        mkdir_p("$root/$dest");
         run_cmd("mount", "--bind", "$src", "$root/$dest");
         run_cmd("mount", "-o", "remount,ro,bind", "$root/$dest")
             if $readonly;
