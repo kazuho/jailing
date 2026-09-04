@@ -22,6 +22,27 @@ For example, if you have Apache HTTP server installed under `/usr/local/apache`,
     /usr/local/apache/bin/httpd -c /usr/local/apache/conf/httpd.conf
 ```
 
+Servers that do not drop privileges themselves, as well as interactive shells,
+can be run as a named user using `--user`.  The user's identity environment is
+initialized and the command starts in their home directory.  `--create-home`
+additionally creates that directory inside the jail:
+
+```
+% sudo jailing --root=/var/playground --user=alice --create-home -- /bin/sh
+```
+
+When `--user` is specified, jailing initializes the user's groups and changes
+to the user's UID and primary GID before executing the command.  It sets
+`HOME`, `USER`, `LOGNAME`, and `SHELL` from the password database.  If the home
+cannot be entered, the command starts in `/` with a warning.  Without `--user`,
+the command starts as root and can perform its own privilege drop.  A missing
+passwd or primary-group entry for the selected user is added to the jail from
+the host database.
+`--create-home` runs `mkhomedir_helper` inside the chroot, using `/etc/skel` to
+initialize a missing home.  An existing home directory, including one provided
+using `--bind`, is never changed.  Home creation also runs when no command is
+given.
+
 For more information, consult `man jailing`.
 
 INSTALLATION
@@ -37,4 +58,3 @@ LICENSE
 -------
 
 MIT
-

@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use Errno ();
 use Getopt::Long;
+use POSIX ();
 use Pod::Usage qw(pod2usage);
 require 'syscall.ph';
 
@@ -49,7 +50,7 @@ our %KEEP_CAPS = map { $_ => 1 } (
     10, # CAP_NET_BIND_SERVICE
 );
 
-my ($root, @bind, @robind, $opt_umount);
+my ($root, @bind, @robind, $opt_umount, $opt_user, $opt_create_home);
 
 GetOptions(
     'root=s'   => \$root,
@@ -59,8 +60,10 @@ GetOptions(
     'robind=s' => sub {
         push @bind, [$_[1], 1];
     },
-    umount     => \$opt_umount,
-    help       => sub {
+    'user=s'     => \$opt_user,
+    'create-home' => \$opt_create_home,
+    umount       => \$opt_umount,
+    help         => sub {
         pod2usage(0);
     },
     version    => sub {
@@ -89,6 +92,52 @@ if ($opt_umount) {
     exit 0;
 }
 
+die "--create-home requires --user\n"
+    if $opt_create_home && !defined $opt_user;
+
+my ($user_name, $user_uid, $user_gid, $user_home, $user_shell,
+    $user_passwd_entry, $user_group_name, $user_group_entry,
+    @user_groups, $mkhomedir_helper);
+if (defined $opt_user) {
+    my @pw = getpwnam($opt_user);
+    die "no such user: $opt_user\n"
+        unless @pw;
+    ($user_name, $user_uid, $user_gid, $user_home, $user_shell)
+        = @pw[0, 2, 3, 7, 8];
+    $user_shell = "/bin/sh"
+        unless defined($user_shell) && length($user_shell);
+    $user_passwd_entry = join ":", map { defined($_) ? $_ : "" }
+        ($pw[0], "x", @pw[2, 3, 6, 7, 8]);
+
+    my @primary_group = getgrgid($user_gid);
+    if (@primary_group) {
+        my ($group_name, $gid, $members) = @primary_group[0, 2, 3];
+        $user_group_name = $group_name;
+        $members = ""
+            unless defined $members;
+        $members =~ s/\s+/,/gs;
+        $user_group_entry = join ":", $user_group_name, "x", $gid, $members;
+    }
+
+    my %groups = ($user_gid => 1);
+    setgrent();
+    while (my @gr = getgrent()) {
+        $groups{$gr[2]} = 1
+            if grep { $_ eq $opt_user } split /\s+/, $gr[3];
+    }
+    endgrent();
+    @user_groups = sort { $a <=> $b } keys %groups;
+}
+
+if ($opt_create_home) {
+    ($mkhomedir_helper) = grep { -x $_ }
+        qw(/usr/sbin/mkhomedir_helper /sbin/mkhomedir_helper);
+    die "--create-home requires mkhomedir_helper\n"
+        unless defined $mkhomedir_helper;
+    die "--create-home requires /etc/skel\n"
+        unless -d "/etc/skel";
+}
+
 # create directories
 mkdir_p($root);
 mkdir_p("$root/$_")
@@ -104,6 +153,13 @@ for my $dir (@TEMPDIRS) {
 for my $file (@COPYFILES) {
     run_cmd("cp", "-p", "/$file", "$root/$file")
         unless -e "$root/$file";
+}
+run_cmd("cp", "-a", "/etc/skel", "$root/etc/skel")
+    if $opt_create_home && !-e "$root/etc/skel";
+if (defined $opt_user) {
+    ensure_database_entry("$root/etc/passwd", $user_name, $user_passwd_entry);
+    ensure_database_entry("$root/etc/group", $user_group_name, $user_group_entry)
+        if defined $user_group_entry;
 }
 
 # bind the directories
@@ -144,25 +200,69 @@ for my $f (qw(random urandom)) {
         unless -e "$root/dev/$f";
 }
 
-# just print the status if no args
-if (! @ARGV) {
+# Just print the status if no command or setup action was requested.
+if (! @ARGV && !$opt_create_home) {
     print "jail is ready!\n";
     exit 0;
 }
 
-# chroot and exec
+# chroot, perform setup actions, and optionally exec
 chroot($root)
     or die "failed to chroot to $root:$!";
 chdir "/"
     or die "failed to chroot to /:$!";
+run_cmd($mkhomedir_helper, $opt_user)
+    if $opt_create_home;
+if (! @ARGV) {
+    print "jail is ready!\n";
+    exit 0;
+}
+if (defined $opt_user) {
+    $ENV{HOME} = $user_home;
+    $ENV{USER} = $user_name;
+    $ENV{LOGNAME} = $user_name;
+    $ENV{SHELL} = $user_shell;
+}
 drop_capabilities();
+switch_user($user_uid, $user_gid, @user_groups)
+    if defined $opt_user;
+if (defined $opt_user && !chdir($user_home)) {
+    warn "failed to chdir to home directory $user_home; staying in /:$!\n";
+}
 exec @ARGV;
 die "failed to exec:$ARGV[0]:$!";
 
 sub run_cmd {
     my @argv = @_;
-    system(@argv) == 0
-        or die "failed to exec $argv[0]:$!";
+    my $status = system(@argv);
+    return if $status == 0;
+    die "failed to exec $argv[0]:$!\n"
+        if $status == -1;
+    die "$argv[0] terminated by signal " . ($status & 127) . "\n"
+        if $status & 127;
+    die "$argv[0] exited with status " . ($status >> 8) . "\n";
+}
+
+sub ensure_database_entry {
+    my ($path, $name, $entry) = @_;
+    open my $read_fh, "<", $path
+        or die "failed to open $path:$!";
+    my $last_line = "";
+    while (my $line = <$read_fh>) {
+        return if $line =~ m{^\Q$name\E:}s;
+        $last_line = $line;
+    }
+    close $read_fh
+        or die "failed to close $path:$!";
+
+    open my $append_fh, ">>", $path
+        or die "failed to open $path:$!";
+    print {$append_fh} "\n"
+        if length($last_line) && $last_line !~ /\n\z/s;
+    print {$append_fh} "$entry\n"
+        or die "failed to update $path:$!";
+    close $append_fh
+        or die "failed to close $path:$!";
 }
 
 sub is_mountpoint {
@@ -202,6 +302,21 @@ sub drop_capabilities {
         if $i == 0;
 }
 
+sub switch_user {
+    my ($uid, $gid, @groups) = @_;
+
+    # The first value assigned to $) is the effective GID; the rest become
+    # the supplementary group list.
+    local $! = 0;
+    $) = join " ", $gid, @groups;
+    die "failed to set groups:$!"
+        if $!;
+    POSIX::setgid($gid) == 0
+        or die "failed to setgid($gid):$!";
+    POSIX::setuid($uid) == 0
+        or die "failed to setuid($uid):$!";
+}
+
 sub mkdir_p {
     my $path = shift;
     return if -e $path;
@@ -222,7 +337,7 @@ jailing - a minimalistic chroot jail builder/runner for Linux
 =head1 SYNOPSIS
 
   # create and/or enter the jail, and optionally run the command
-  jailing --root=/path/to/chroot/jail [cmd ...]
+  jailing --root=/path/to/chroot/jail [--user=name [--create-home]] [cmd ...]
 
   # unmount the bind mounts of the jail
   jailing --root=/path/to/chroot/jail --umount
@@ -240,15 +355,39 @@ The system directories are remounted read-only (via `mount --bind` and `mount -o
 mandatory argument specifying the root of the chroot jail.
 The directory is automatically created if it does not exist.
 
-=head2 --bind src-path[:dest-path]
-
-=head2 --robind src-path[:dest-path]
+=head2 --bind src-path[:dest-path], --robind src-path[:dest-path]
 
 mounts src-path of host to dest-path of the jail.
 Both paths should be specified in absolute form (i.e. start with C</>).
 If dest-path is omitted, then it would be mounted at C<src-path> in the jail.
 
 C<--bind> mounts the path in read-write mode.  C<--robind> mounts as read-only.
+
+=head2 --user=name
+
+runs the command as the named user.  The user's primary and supplementary
+groups are initialized before changing the UID.  C<HOME>, C<USER>, C<LOGNAME>,
+and C<SHELL> are set from the user's password database entry, and the working
+directory is changed to the user's home directory.  An empty login shell
+defaults to C</bin/sh>.
+
+If the named account or its primary group is absent from the jail's copied
+password and group databases, the corresponding host entry is added.
+
+If the home directory does not exist or is not accessible to the user, a
+warning is printed and the command starts in C</>.
+
+If this option is omitted, the command starts as root, allowing a server to
+perform its own privilege drop.
+
+=head2 --create-home
+
+creates the home directory specified for C<--user> inside the jail if it does
+not exist by running C<mkhomedir_helper> after entering the chroot.  The
+helper initializes the home from C</etc/skel> and leaves an existing home
+unchanged.  Home creation is performed even when no command is supplied.
+
+This option requires C<--user>, C<mkhomedir_helper>, and C</etc/skel>.
 
 =head2 --umount
 
@@ -261,4 +400,3 @@ Kazuho Oku
 =head1 LICENSE
 
 MIT
-
